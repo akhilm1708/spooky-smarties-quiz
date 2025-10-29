@@ -2,7 +2,7 @@
 
 ## Project info
 
-**URL**: https://lovable.dev/projects/25a6a1e0-b812-4443-8ead-f1869dea41fc
+**URL**: https://spooky-smarties-quiz.lovable.app/?utm_source=lovable-editor
 
 ## How can I edit this code?
 
