@@ -108,7 +108,7 @@ export const QuizGame = () => {
               <Ghost className="w-12 h-12 animate-bounce" />
             </div>
             <CardTitle className="text-5xl font-bold text-primary">
-              🎃 Halloween Trivia Challenge
+              🎃 Trick or Trivia
             </CardTitle>
             <CardDescription className="text-xl text-foreground/80">
               Test your spooky smarts!
