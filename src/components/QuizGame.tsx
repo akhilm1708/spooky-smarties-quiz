@@ -1,8 +1,14 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Question, getRandomQuestions } from "@/data/questions";
 import { Ghost, Skull } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+
+interface Question {
+  question: string;
+  options: string[];
+  answer: string;
+}
 
 interface UserAnswer {
   question: string;
@@ -14,20 +20,49 @@ interface UserAnswer {
 }
 
 export const QuizGame = () => {
+  const { toast } = useToast();
   const [gameState, setGameState] = useState<"start" | "quiz" | "results" | "review">("start");
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [userAnswers, setUserAnswers] = useState<UserAnswer[]>([]);
   const [loadingSummaries, setLoadingSummaries] = useState(false);
+  const [isLoadingQuestions, setIsLoadingQuestions] = useState(false);
 
-  const startQuiz = () => {
-    const randomQuestions = getRandomQuestions(10);
-    setQuestions(randomQuestions);
-    setGameState("quiz");
-    setCurrentQuestionIndex(0);
-    setUserAnswers([]);
-    setSelectedAnswer(null);
+  const startQuiz = async () => {
+    setIsLoadingQuestions(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-questions`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ count: 10 }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to generate questions");
+      }
+
+      const data = await response.json();
+      setQuestions(data.questions);
+      setGameState("quiz");
+      setCurrentQuestionIndex(0);
+      setUserAnswers([]);
+      setSelectedAnswer(null);
+    } catch (error) {
+      console.error("Error generating questions:", error);
+      toast({
+        title: "Error",
+        description: "Failed to generate questions. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingQuestions(false);
+    }
   };
 
   const handleAnswerSelect = (answer: string) => {
@@ -115,8 +150,13 @@ export const QuizGame = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center">
-            <Button onClick={startQuiz} size="lg" className="text-lg px-8">
-              Start the Quiz
+            <Button 
+              onClick={startQuiz} 
+              size="lg" 
+              className="text-lg px-8"
+              disabled={isLoadingQuestions}
+            >
+              {isLoadingQuestions ? "Generating Spooky Questions..." : "Start the Quiz"}
             </Button>
           </CardContent>
         </Card>
