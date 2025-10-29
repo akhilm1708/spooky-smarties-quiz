@@ -44,6 +44,14 @@ export const QuizGame = () => {
       );
 
       if (!response.ok) {
+        if (response.status === 429) {
+          toast({
+            title: "Rate Limit Reached",
+            description: "Too many requests. Please wait a minute and try again.",
+            variant: "destructive",
+          });
+          return;
+        }
         throw new Error("Failed to generate questions");
       }
 
@@ -57,7 +65,7 @@ export const QuizGame = () => {
       console.error("Error generating questions:", error);
       toast({
         title: "Error",
-        description: "Failed to generate questions. Please try again.",
+        description: "Failed to generate questions. Please try again in a moment.",
         variant: "destructive",
       });
     } finally {
@@ -96,38 +104,63 @@ export const QuizGame = () => {
 
   const generateSummaries = async () => {
     setLoadingSummaries(true);
-    const updatedAnswers = await Promise.all(
-      userAnswers.map(async (answer) => {
-        try {
-          const response = await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-summary`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                question: answer.question,
-                answer: answer.correctAnswer,
-              }),
-            }
-          );
-
-          if (!response.ok) {
-            throw new Error("Failed to generate summary");
+    
+    // Add delay between requests to avoid rate limits
+    const generateWithDelay = async (answer: UserAnswer, index: number) => {
+      // Wait 300ms between each request
+      await new Promise(resolve => setTimeout(resolve, index * 300));
+      
+      try {
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-summary`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              question: answer.question,
+              answer: answer.correctAnswer,
+            }),
           }
+        );
 
-          const data = await response.json();
-          return { ...answer, summary: data.summary };
-        } catch (error) {
-          console.error("Error generating summary:", error);
-          return { ...answer, summary: "Summary unavailable." };
+        if (response.status === 429) {
+          return { 
+            ...answer, 
+            summary: "⏳ Rate limit reached. Please wait a moment before reviewing answers." 
+          };
         }
-      })
-    );
-    setUserAnswers(updatedAnswers);
-    setLoadingSummaries(false);
-    setGameState("review");
+
+        if (!response.ok) {
+          throw new Error("Failed to generate summary");
+        }
+
+        const data = await response.json();
+        return { ...answer, summary: data.summary };
+      } catch (error) {
+        console.error("Error generating summary:", error);
+        return { ...answer, summary: "Summary unavailable." };
+      }
+    };
+
+    try {
+      const updatedAnswers = await Promise.all(
+        userAnswers.map((answer, index) => generateWithDelay(answer, index))
+      );
+      setUserAnswers(updatedAnswers);
+      setGameState("review");
+    } catch (error) {
+      console.error("Error generating summaries:", error);
+      toast({
+        title: "Error",
+        description: "Failed to generate summaries. You can still review your answers.",
+        variant: "destructive",
+      });
+      setGameState("review");
+    } finally {
+      setLoadingSummaries(false);
+    }
   };
 
   const correctAnswersCount = userAnswers.filter((a) => a.isCorrect).length;
